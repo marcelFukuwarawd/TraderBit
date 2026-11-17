@@ -1,0 +1,65 @@
+```yaml
+name: Gerar APK BTC Trader Sim
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Montar projeto Android automaticamente
+        run: python3 setup_project.py
+
+      - name: Preparar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Aceitar licencas Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar APK Final
+        run: gradle assembleRelease --no-daemon
+
+      - name: Renomear APK
+        run: |
+          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          cp "$APK_FILE" BTC-Trader-Sim-Final.apk
+
+      - name: Salvar copia nos Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BTC-Trader-Sim-Final-APK
+          path: BTC-Trader-Sim-Final.apk
+          retention-days: 90
+
+      - name: Publicar APK pronto para download direto (Releases)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" BTC-Trader-Sim-Final.apk \
+            --repo "${{ github.repository }}" \
+            --title "BTC Trader Sim v1.0.${{ github.run_number }}" \
+            --notes "Toque em BTC-Trader-Sim-Final.apk abaixo para baixar e instalar no Android."
+```
